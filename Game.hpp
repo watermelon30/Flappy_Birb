@@ -14,16 +14,19 @@ public:
 
 private:
 	bool isRunning;
+	int windowH, windowW;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	SDL_Surface* surface;
-	SDL_Texture* background;
-	SDL_Texture* birb[4];
-	SDL_Texture* currentBirb;
-    SDL_Rect dest[4]; // struct to hold the position and size of the sprite
+	SDL_Surface* birbs[4];
 
-	bool fly = false;
-	float x_vel =0, y_vel=0, x_pos=0, y_pos=0;
+	SDL_Texture* background;
+	SDL_Texture* birbPics[4];
+	SDL_Texture* currentBirb;
+    SDL_Rect dest; // struct to hold the position and size of the sprite
+
+	bool fly = false, dead = false;
+	float x_vel =0, y_vel=0, x_pos=50, y_pos= 50;
 
 	int counter=0;
 
