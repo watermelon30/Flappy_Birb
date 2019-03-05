@@ -3,7 +3,6 @@
 #include <iostream>
 #include "SDL2/SDL.h"
 #include <SDL2/SDL_image.h>
-#include "SDL2_gfxPrimitives.h"
 
 using namespace std;
 
@@ -72,8 +71,19 @@ void Game::init(const char* title, int x, int y, int width, int height){
         // get the dimensions of texture
         SDL_QueryTexture(birbPics[i], NULL, NULL, &dest.w, &dest.h);
         //cout << dest[i].h << " " << dest[i].w;
-
     }
+
+    barSurface = IMG_Load("resources/pipe.png");
+    if (!barSurface)
+    {
+        cout << "error loading pipe picture: " << SDL_GetError() << endl;
+        clean();
+        return;
+    }
+
+    // load the image data into the graphics hardware's memory
+    bars[0].pic = SDL_CreateTextureFromSurface(renderer, barSurface);
+    SDL_FreeSurface(barSurface);
 
 
     dest.w /= 6;
@@ -115,6 +125,7 @@ void Game::render(){
 
         currentBirb = birbPics[counter];
         SDL_RenderCopy(renderer, currentBirb, NULL, &dest);
+        SDL_RenderCopy(renderer, bars[0].pic, NULL, NULL);
 
 
         // draw the image to the window
