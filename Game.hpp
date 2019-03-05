@@ -28,6 +28,6 @@ private:
 	bool fly = false, dead = false;
 	float x_vel =0, y_vel=0, x_pos=50, y_pos= 50;
 
-	int counter=0;
+	int counter=0, tempCounter=0;
 
 };

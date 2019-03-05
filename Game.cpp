@@ -139,11 +139,14 @@ bool Game::running(){return isRunning;}
 
 void Game::update(){
 
-    counter = (counter == 1)? counter+1: 0;
-
+    if(tempCounter == 4){
+        tempCounter=0;
+        if(counter==3)counter = 0;
+        else counter++;
+    }
+    else tempCounter++;
 
     if(fly){
-        counter = 1;
         dead = false;;
         y_vel = -25; //Flying up
     } 
