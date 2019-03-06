@@ -1,5 +1,7 @@
 #include "Game.hpp"
 #include <stdio.h>
+#include <stdlib.h> 
+#include <time.h>       /* time */
 #include <iostream>
 #include "SDL2/SDL.h"
 #include <SDL2/SDL_image.h>
@@ -8,7 +10,9 @@ using namespace std;
 
 
 
-Game::Game(){}
+Game::Game(){
+    srand(time(NULL));
+}
 Game::~Game(){}
 void Game::init(const char* title, int x, int y, int width, int height){
     windowH = height;
@@ -29,7 +33,6 @@ void Game::init(const char* title, int x, int y, int width, int height){
 		return;
     }
 
-
     surface = IMG_Load("resources/background.png");
     if (!surface)
     {
@@ -41,8 +44,7 @@ void Game::init(const char* title, int x, int y, int width, int height){
     // load the image data into the graphics hardware's memory
     background = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_FreeSurface(surface);
-    if (!background)
-    {
+    if (!background){
         cout << "error creating background: " << SDL_GetError() << endl;
         clean();
         return;
@@ -51,44 +53,79 @@ void Game::init(const char* title, int x, int y, int width, int height){
     for(int i=0;i<4;i++){
         string path = "resources/birb" + to_string(i) + ".png";
         surface = IMG_Load(path.c_str());
-        if (!surface)
-        {
+        if (!surface){
             cout << "error loading birb pictures: " << SDL_GetError() << endl;
             clean();
             return;
         }
 
-        birbPics[i] = SDL_CreateTextureFromSurface(renderer, surface);
+        birby.birbPics[i] = SDL_CreateTextureFromSurface(renderer, surface);
         SDL_FreeSurface(surface);
 
-        if (!birbPics[i])
-        {
+        if (!birby.birbPics[i]){
             cout << "error creating birb: " << SDL_GetError() << endl;
             clean();
             return;
         }
         // struct to hold the position and size of the sprite
         // get the dimensions of texture
-        SDL_QueryTexture(birbPics[i], NULL, NULL, &dest.w, &dest.h);
-        //cout << dest[i].h << " " << dest[i].w;
+        SDL_QueryTexture(birby.birbPics[i], NULL, NULL, &birby.coord.w, &birby.coord.h);
+        //cout << coord.h << " " << coord.w;
     }
 
-    barSurface = IMG_Load("resources/pipe.png");
-    if (!barSurface)
-    {
+    //Scaling down the birb size;
+    birby.coord.w /= 8;
+    birby.coord.h /= 8;
+    birby.coord.y = y_pos;
+    birby.coord.x = 50;
+
+
+
+    surface = IMG_Load("resources/pipe.png");
+    if (!surface){
         cout << "error loading pipe picture: " << SDL_GetError() << endl;
         clean();
         return;
     }
 
-    // load the image data into the graphics hardware's memory
-    bars[0].pic = SDL_CreateTextureFromSurface(renderer, barSurface);
-    SDL_FreeSurface(barSurface);
+
+    barGap = birby.coord.w * 2.5;
 
 
-    dest.w /= 6;
-    dest.h /= 6;
-    dest.y = y_pos;
+    lowerBarY = windowH - surface->h; //The y position where the lower bar will be in screen fully. 
+
+    for(int i=0;i<6;i++){
+        lowerbars[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_QueryTexture(lowerbars[i].pic, NULL, NULL, &lowerbars[i].coord.w, &lowerbars[i].coord.h);
+        if (!lowerbars[i].pic){
+            cout << "error creating lowerbars: " << SDL_GetError() << endl;
+            clean();
+            return;
+        }
+        lowerbars[i].coord.y =  lowerBarY + rand()%randomRange; 
+        lowerbars[i].coord.x = windowW + i * barGap;//windowH - upperbars[i].coord.h; 
+    }
+
+    barDiff = surface->h +barGapV;
+
+    for(int i=0;i<6;i++){
+        upperbars[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_QueryTexture(upperbars[i].pic, NULL, NULL, &upperbars[i].coord.w, &upperbars[i].coord.h);
+        if (!upperbars[i].pic){
+            cout << "error creating upperbars: " << SDL_GetError() << endl;
+            clean();
+            return;
+        }
+        upperbars[i].coord.y = lowerbars[i].coord.y - barDiff;
+        upperbars[i].coord.x = lowerbars[i].coord.x;//windowH - upperbars[i].coord.h; 
+    }
+
+
+    SDL_FreeSurface(surface);
+
+
+
+
     //SDL_SetRenderDrawColor(renderer, 255,255,255,100);
     // circleColor(renderer, 0, 0, 50, 0x008800);
     isRunning = true;
@@ -117,22 +154,25 @@ void Game::handleEvents(){
 	return;
 }
 void Game::render(){
+
 	    // clear the window
         SDL_RenderClear(renderer);
         
         SDL_RenderCopy(renderer, background, NULL, NULL);
 
-
-        currentBirb = birbPics[counter];
-        SDL_RenderCopy(renderer, currentBirb, NULL, &dest);
-        SDL_RenderCopy(renderer, bars[0].pic, NULL, NULL);
+        SDL_RenderCopy(renderer, birby.birbPics[counter], NULL, &birby.coord);
+        
+        for(int i=0;i<6;i++){
+            SDL_RenderCopy(renderer, lowerbars[i].pic, NULL,  &lowerbars[i].coord);
+            SDL_RenderCopyEx(renderer, upperbars[i].pic, NULL,  &upperbars[i].coord, 180, NULL, SDL_FLIP_NONE);
+        }
 
 
         // draw the image to the window
         SDL_RenderPresent(renderer);
 
         // wait 1/60th of a second
-        SDL_Delay(1000/40);
+        SDL_Delay(1000/60);
 
         return;
 }
@@ -158,24 +198,32 @@ void Game::update(){
     else tempCounter++;
 
     if(fly){
-        dead = false;;
-        y_vel = -25; //Flying up
+        birby.y_vel = -25; //Flying up
+        fly = false;
     } 
+    if(!dead) birby.y_vel +=2; //Dropping 
     
-    
-    if(!dead) y_vel +=3; //Dropping 
-    
-    y_pos += y_vel;
+     birby.coord.y += birby.y_vel;
 
-    if(y_pos > windowH-dest.h) {
-        y_pos = windowH-dest.h;
-        y_vel = 0;
-        dead = true;
-        cout << "d";
+    if( birby.coord.y > windowH-birby.coord.h) {
+        birby.coord.y = windowH-birby.coord.h;
+        birby.y_vel = 0;
     }
 
-    dest.y = y_pos;
+    //Bars x positions update.
+    for(int i=0; i<6;i++){
+        lowerbars[i].coord.x += bar_vel;
+        if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {
+            //Move to the back of the last bar with bar gap and  
+            lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barGap + bar_vel;   
+            lowerbars[i].coord.y = lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
+            upperbars[i].coord.y = lowerbars[i].coord.y - barDiff;
+        }
+        upperbars[i].coord.x = lowerbars[i].coord.x;
+    }
+}
 
-    fly = false;
+
+int Game::randomYPosForLowerBar(){
 
 }
