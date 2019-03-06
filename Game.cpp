@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h> 
 #include <time.h>       /* time */
+#include <math.h>
 #include <iostream>
 #include "SDL2/SDL.h"
 #include <SDL2/SDL_image.h>
@@ -15,6 +16,8 @@ Game::Game(){
 }
 Game::~Game(){}
 void Game::init(const char* title, int x, int y, int width, int height){
+    const int initialX = 50;
+    const int initialY = 50;
     windowH = height;
     windowW = width;    
 	window = SDL_CreateWindow("Flappy birby", x, y, width, height, 0);
@@ -33,6 +36,7 @@ void Game::init(const char* title, int x, int y, int width, int height){
 		return;
     }
 
+    //Loading background image.
     surface = IMG_Load("resources/background.png");
     if (!surface)
     {
@@ -50,6 +54,8 @@ void Game::init(const char* title, int x, int y, int width, int height){
         return;
     }
 
+
+    //Loading birby image.
     for(int i=0;i<4;i++){
         string path = "resources/birb" + to_string(i) + ".png";
         surface = IMG_Load(path.c_str());
@@ -74,13 +80,20 @@ void Game::init(const char* title, int x, int y, int width, int height){
     }
 
     //Scaling down the birb size;
-    birby.coord.w /= 8;
-    birby.coord.h /= 8;
-    birby.coord.y = y_pos;
-    birby.coord.x = 50;
+    birby.coord.w /= 10;
+    birby.coord.h /= 10;
+    birby.radius /= 10;
+    birby.midX /= 10;
+    birby.midY /= 10;
+
+    //Initialise the original coordinate
+    birby.coord.y = initialY;
+    birby.coord.x = initialX;
+    birby.midX += initialX; //x position of the middle of the birby. Will never change afterward.
 
 
 
+    //Loading pipe image.
     surface = IMG_Load("resources/pipe.png");
     if (!surface){
         cout << "error loading pipe picture: " << SDL_GetError() << endl;
@@ -89,10 +102,10 @@ void Game::init(const char* title, int x, int y, int width, int height){
     }
 
 
-    barGap = birby.coord.w * 2.5;
+    barInfo.barGap = birby.coord.w * 4;
 
 
-    lowerBarY = windowH - surface->h; //The y position where the lower bar will be in screen fully. 
+    barInfo.lowerBarY = windowH - surface->h; //The y position where the lower bar will be in screen fully. 
 
     for(int i=0;i<6;i++){
         lowerbars[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
@@ -102,11 +115,11 @@ void Game::init(const char* title, int x, int y, int width, int height){
             clean();
             return;
         }
-        lowerbars[i].coord.y =  lowerBarY + rand()%randomRange; 
-        lowerbars[i].coord.x = windowW + i * barGap;//windowH - upperbars[i].coord.h; 
+        lowerbars[i].coord.y =  barInfo.lowerBarY + rand()%randomRange; 
+        lowerbars[i].coord.x = windowW + i * barInfo.barGap;//windowH - upperbars[i].coord.h; 
     }
 
-    barDiff = surface->h +barGapV;
+    barInfo.barDiff = surface->h +barInfo.barGapV;
 
     for(int i=0;i<6;i++){
         upperbars[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
@@ -116,7 +129,7 @@ void Game::init(const char* title, int x, int y, int width, int height){
             clean();
             return;
         }
-        upperbars[i].coord.y = lowerbars[i].coord.y - barDiff;
+        upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.barDiff;
         upperbars[i].coord.x = lowerbars[i].coord.x;//windowH - upperbars[i].coord.h; 
     }
 
@@ -198,9 +211,9 @@ void Game::update(){
     else tempCounter++;
 
     if(fly){
-        birby.y_vel = -25; //Flying up
+        birby.y_vel = -20; //Flying up
         fly = false;
-    } 
+    }
     if(!dead) birby.y_vel +=2; //Dropping 
     
      birby.coord.y += birby.y_vel;
@@ -212,18 +225,80 @@ void Game::update(){
 
     //Bars x positions update.
     for(int i=0; i<6;i++){
-        lowerbars[i].coord.x += bar_vel;
-        if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {
-            //Move to the back of the last bar with bar gap and  
-            lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barGap + bar_vel;   
-            lowerbars[i].coord.y = lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
-            upperbars[i].coord.y = lowerbars[i].coord.y - barDiff;
+        lowerbars[i].coord.x += barInfo.bar_vel;
+        //Bar that disappeared on the screen
+        if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {  
+            //Move to the position of the last bar plus bar gap and bar velo.  
+            lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barInfo.barGap + barInfo.bar_vel;   
+            lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
+            upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.barDiff;
+
+            closestBar = i+1;   //The closest bar move forward.
         }
+        //Move the upper bar to the top of lower bar.
         upperbars[i].coord.x = lowerbars[i].coord.x;
     }
+
+    if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
+        dead = true;
+    }
+
+}
+
+float Game::distance(int x1, int y1, int x2, int y2){
+    int dx = x1 - x2;
+    int dy = y1 - y2;
+    return sqrt(dx*dx + dy*dy);
 }
 
 
-int Game::randomYPosForLowerBar(){
 
+bool Game::closestFromCirToRec(int x, int y, int rX, int rY, int rW, int rH, int &closestX, int &closestY){
+    bool betweenBar = false;
+    //Check the closest x position on the bar that is closest from bar to the point.
+    if(x < rX) closestX = rX; //Left side of the rect
+    else if(x > rX + rW) closestX = rX+rW; //Right side of the rect.
+    else {
+        closestX = x;
+        betweenBar = true;
+    }  //X position of the point is the closest to the rect.
+
+    if(y < rY) closestY = rY; //Top of the rect
+    else if(y > rY + rH) closestY = rY + rH; //Bottom of the rect.
+    else closestY = y;  //Y position of the point is the closest to the bar.
+
+    return betweenBar;
+}
+
+
+bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barinfo, Birb birb){
+    int midY = birb.coord.y + birb.midY;
+
+    //Checking for collision with bar heads.
+    int closestX, closestY;
+    bool betweenBar;
+    betweenBar = closestFromCirToRec(
+        birb.midX, midY, 
+        lowerbar.coord.x, lowerbar.coord.y, 
+        lowerbar.coord.w, barinfo.barHeadH,
+        closestX, closestY);
+
+    if(distance(birb.midX, midY, closestX, closestY) > birb.radius) return true;
+
+    closestFromCirToRec(
+        birb.midX, midY, 
+        upperbar.coord.x, upperbar.coord.y, 
+        upperbar.coord.w, barinfo.barHeadH,
+        closestX, closestY);
+
+    if(distance(birb.midX, midY, closestX, closestY) > birb.radius) return true;
+
+
+    //Checking for collision with bar body.
+    if(!betweenBar){
+        int birbyTR_X = birb.coord.x + birb.coord.w;
+        int barBodyX = lowerbar.coord.x + barInfo.bodyHeadDiff;
+        if(birbyTR_X >barBodyX) return true;
+    }
+    return false;
 }
