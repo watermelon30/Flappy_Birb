@@ -143,6 +143,7 @@ void Game::init(const char* title, int x, int y){
 
     SDL_FreeSurface(surface);
 
+
     //Initialise sdl ttf library.
     if(TTF_Init()== -1){
         cout << "error initialsing ttf library" << endl;
@@ -156,7 +157,7 @@ void Game::init(const char* title, int x, int y){
     }
 
     score.color = {100,0,0};
-    surface = TTF_RenderText_Solid(score.font, "This is a text"/*to_string(score.value).c_str()*/, score.color);
+    surface = TTF_RenderText_Solid(score.font, to_string(score.value).c_str(), score.color);
 
     score.display = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_QueryTexture(score.display, NULL, NULL, &score.coord.w, &score.coord.h);
@@ -258,7 +259,6 @@ void Game::update(){
     //Bars x positions update.
     for(int i=0; i<6;i++){
         lowerbars[i].coord.x += barInfo.bar_vel;
-
         //Bar that disappeared on the screen
         if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {
             //Move to the position of the last bar plus bar gap and bar velo.  
@@ -267,18 +267,29 @@ void Game::update(){
             //lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
             upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
 
-            closestBar = (i==5)? 0: i+1;   //The closest bar move forward.
         }
         //Move the upper bar to the top of lower bar.
         upperbars[i].coord.x = lowerbars[i].coord.x;
     }
 
-    if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
-        cout << "dead" << endl;
-        birby.dead = true;
-        isRunning = false;
-    }
 
+    //Check if birby has passed the bar fully.
+    if(birby.midX - birby.radius < upperbars[closestBar].coord.x + upperbars[closestBar].coord.w){
+        //Checking for collision if the right of the birby is touching the bar.
+        if(birby.midX + birby.radius > upperbars[closestBar].coord.x){
+            if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
+                cout << "dead" << endl;
+                birby.dead = true;
+                isRunning = false;
+            }
+        }
+    }
+    //If passed the bar, add score and change the closest bar. 
+    else {
+        closestBar = (closestBar==5)? 0: closestBar+1;   //The closest bar move forward.
+        score.value++;
+        changeScore();
+    }
 }
 
 float Game::distance(int x1, int y1, int x2, int y2){
@@ -287,34 +298,30 @@ float Game::distance(int x1, int y1, int x2, int y2){
     return sqrt(dx*dx + dy*dy);
 }
 
-
-
 bool Game::circleRectCollision(int x, int y, int r, int rX, int rY, int rW, int rH, bool &topOfRect){
-    bool upperBarX = false; //To check if circle is on top of the rect in X direction
-    //bool touchX=false, touchY=false; //Check collision in x and y direction.
     int closestX, closestY;   //Finding the closest point on the rect 
     topOfRect = false;
 
 
+    //Finding the closest x position from rect body to circle centre.
     if(x < rX) closestX = rX; //Circle is at the left side of rectangle
-    else if(x > rX + rW) closestX = rX + rW; //Circle is at the left side of rectangle
+    else if(x > rX + rW) closestX = rX + rW; //Circle is at the right side of rectangle
     else { //Circle is touching rectangle in x direction.
         closestX = x;
     }
 
-    if(x+r > rX && x-r < rX+rW) upperBarX = true;
-
-    if(y < rY) { //Circle is at the top of rectangle
+    //Finding the closest y position from rect body to circle centre.
+    if(y < rY) { //Circle is on top of rectangle
         closestY =rY;
-        /*if(y+r < rY)*/ topOfRect = upperBarX && true;    //Detecting if the point is right above the bar.
+        topOfRect = true;    //Detecting if the point is right above the bar.
     }
     else if(y > rY + rH) closestY =rY+rH; //Circle is at the bottom of rectangle
-    else {
+    else {  //Circle is touching rectangle in y direction.
         closestY = y;
     }
 
-    //Check thee closest point and circle centre (This is for checking collision on the corner of rect).
-    if(distance(x, y, closestX, closestY) < float(r)) {return true; cout << "y"<<endl;}
+    //Check the collision.
+    if(distance(x, y, closestX, closestY) < float(r)) {return true;}
     
     return false;
 }
@@ -324,9 +331,9 @@ bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb){
 
     int midY = birb.coord.y + birb.midY; //Getting the current centre y of the birb.
 
-    //Checking for collision with bar heads.
-    
-    bool aboveUpperBar, aboveLowerBar;
+
+
+    bool aboveUpperBar, aboveLowerBar; //To check whether the position of the birb is above the bar heads.
 
     //Checking collision with lower bar head.
     if(circleRectCollision(
@@ -343,8 +350,7 @@ bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb){
         upperbar.coord.w, barInfo.barHeadH,
         aboveUpperBar)) return true;
 
-    //Checking for collision with bar body.
-        //Only check when circle is on or under the heads of upper and lower bar.
+    //Checking for collision with bar body when birby position is not inside upper and lower bar heads.
     if(aboveLowerBar == aboveUpperBar){
         int barBodyX = upperbar.coord.x + barInfo.bodyHeadDiff; //X coordinate of the left side of the bar body.
         if(abs(barBodyX-birb.midX) <birb.radius) return true;
@@ -352,7 +358,20 @@ bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb){
     return false;
 }
 
+
+
 void Game::randomForLowerBarY(int& y){
     //Random y coordinate in a range of highestBarPos to lowestBarPos
     y = rand() % (lowestBarPos - highestBarPos) + highestBarPos; 
+}
+
+
+void Game::changeScore(){
+    surface = TTF_RenderText_Solid(score.font, to_string(score.value).c_str(), score.color);
+
+    score.display = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_QueryTexture(score.display, NULL, NULL, &score.coord.w, &score.coord.h);
+
+    SDL_FreeSurface(surface);
+
 }

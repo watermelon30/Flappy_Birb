@@ -30,7 +30,8 @@ struct BarInfo{
 
 
 struct Score{
-	int value;
+	int value = 0;
+	int highestScore = 0;
 	SDL_Texture* display;
 	TTF_Font* font;
 	SDL_Color color;
