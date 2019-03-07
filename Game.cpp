@@ -6,6 +6,7 @@
 #include <iostream>
 #include "SDL2/SDL.h"
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 
 using namespace std;
 
@@ -15,12 +16,11 @@ Game::Game(){
     srand(time(NULL));
 }
 Game::~Game(){}
-void Game::init(const char* title, int x, int y, int width, int height){
+
+void Game::init(const char* title, int x, int y){
     const int initialX = 50;
     const int initialY = 50;
-    windowH = height;
-    windowW = width;    
-	window = SDL_CreateWindow("Flappy birby", x, y, width, height, 0);
+	window = SDL_CreateWindow("Flappy birby", x, y, windowW, windowH, 0);
     if (!window) {
     	cout << "error creating window: " << SDL_GetError() << endl;
         SDL_Quit();
@@ -38,8 +38,7 @@ void Game::init(const char* title, int x, int y, int width, int height){
 
     //Loading background image.
     surface = IMG_Load("resources/background.png");
-    if (!surface)
-    {
+    if (!surface){
         cout << "error loading background picture: " << SDL_GetError() << endl;
         clean();
         return;
@@ -90,8 +89,7 @@ void Game::init(const char* title, int x, int y, int width, int height){
     birby.coord.y = initialY;
     birby.coord.x = initialX;
     birby.midX += initialX; //x position of the middle of the birby. Will never change afterward.
-
-
+    
 
     //Loading pipe image.
     surface = IMG_Load("resources/pipe.png");
@@ -104,9 +102,14 @@ void Game::init(const char* title, int x, int y, int width, int height){
     //Gap between each bar depends on the size of the birb
     barInfo.barGap = birby.coord.w * 8;
 
+    //The y position where the lower bar will be in screen fully.
+    barInfo.lowerBarY = windowH - surface->h;  
 
-    barInfo.lowerBarY = windowH - surface->h; //The y position where the lower bar will be in screen fully. 
+    highestBarPos = 100 + barInfo.barGapV; //
 
+
+
+    //Loading bar textures. 6 for upper, 6 for lower.
     for(int i=0;i<6;i++){
         lowerbars[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
         SDL_QueryTexture(lowerbars[i].pic, NULL, NULL, &lowerbars[i].coord.w, &lowerbars[i].coord.h);
@@ -115,11 +118,13 @@ void Game::init(const char* title, int x, int y, int width, int height){
             clean();
             return;
         }
-        lowerbars[i].coord.y =  barInfo.lowerBarY + rand()%randomRange; 
+        //Assigning random position.
+        randomForLowerBarY(lowerbars[i].coord.y);
+//        lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; 
         lowerbars[i].coord.x = windowW + i * barInfo.barGap;//windowH - upperbars[i].coord.h; 
     }
 
-    barInfo.barDiff = surface->h +barInfo.barGapV;
+    barInfo.headDist = lowerbars[0].coord.h +barInfo.barGapV;
 
     for(int i=0;i<6;i++){
         upperbars[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
@@ -129,19 +134,43 @@ void Game::init(const char* title, int x, int y, int width, int height){
             clean();
             return;
         }
-        upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.barDiff;
-        upperbars[i].coord.x = lowerbars[i].coord.x;//windowH - upperbars[i].coord.h; 
-    }
+        //Upper bar needs to have a fixed distance with lower bar in y direction.
+        upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
 
+        //Need to be parallel with lower bar.
+        upperbars[i].coord.x = lowerbars[i].coord.x;
+    }
 
     SDL_FreeSurface(surface);
 
+    //Initialise sdl ttf library.
+    if(TTF_Init()== -1){
+        cout << "error initialsing ttf library" << endl;
+        return;
+    }
+    score.value = 0;
+    score.font = TTF_OpenFont("resources/Roboto-Bold.ttf", 24);
+    if(!score.font){
+        cout << "error loading font: " << SDL_GetError() << endl;
+        return;
+    }
 
+    score.color = {100,0,0};
+    surface = TTF_RenderText_Solid(score.font, "This is a text"/*to_string(score.value).c_str()*/, score.color);
 
+    score.display = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_QueryTexture(score.display, NULL, NULL, &score.coord.w, &score.coord.h);
+
+    //Place the text box at the top middle of screen.
+    score.coord.x = windowW / 2 - score.coord.w / 2;
+    score.coord.y = windowH / 6;
+
+    SDL_FreeSurface(surface);
 
     //SDL_SetRenderDrawColor(renderer, 255,255,255,100);
     // circleColor(renderer, 0, 0, 50, 0x008800);
     isRunning = true;
+    return;
 }
  
 
@@ -159,13 +188,15 @@ void Game::handleEvents(){
                 case SDL_SCANCODE_KP_SPACE:
                 case SDL_SCANCODE_UP:
                 // case SDL_BUTTON_LEFT:
-                    fly = true;
+                    birby.fly = true;
                     break;
             }
             break;
 	}
 	return;
 }
+
+
 void Game::render(){
 
 	    // clear the window
@@ -180,6 +211,7 @@ void Game::render(){
             SDL_RenderCopyEx(renderer, upperbars[i].pic, NULL,  &upperbars[i].coord, 180, NULL, SDL_FLIP_NONE);
         }
 
+        SDL_RenderCopy(renderer, score.display , NULL,  &score.coord);
 
         // draw the image to the window
         SDL_RenderPresent(renderer);
@@ -210,11 +242,11 @@ void Game::update(){
     }
     else tempCounter++;
 
-    if(fly){
+    if(birby.fly){
         birby.y_vel = -18; //Flying up
-        fly = false;
+        birby.fly = false;
     }
-    if(!dead) birby.y_vel +=2; //Dropping 
+    if(!birby.dead) birby.y_vel +=2; //Dropping 
     
      birby.coord.y += birby.y_vel;
 
@@ -226,12 +258,14 @@ void Game::update(){
     //Bars x positions update.
     for(int i=0; i<6;i++){
         lowerbars[i].coord.x += barInfo.bar_vel;
+
         //Bar that disappeared on the screen
         if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {
             //Move to the position of the last bar plus bar gap and bar velo.  
-            lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barInfo.barGap + barInfo.bar_vel;   
-            lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
-            upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.barDiff;
+            lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barInfo.barGap + barInfo.bar_vel;
+            randomForLowerBarY(lowerbars[i].coord.y);
+            //lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
+            upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
 
             closestBar = (i==5)? 0: i+1;   //The closest bar move forward.
         }
@@ -241,7 +275,7 @@ void Game::update(){
 
     if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
         cout << "dead" << endl;
-        dead = true;
+        birby.dead = true;
         isRunning = false;
     }
 
@@ -268,10 +302,7 @@ bool Game::circleRectCollision(int x, int y, int r, int rX, int rY, int rW, int 
         closestX = x;
     }
 
-
     if(x+r > rX && x-r < rX+rW) upperBarX = true;
-
-
 
     if(y < rY) { //Circle is at the top of rectangle
         closestY =rY;
@@ -318,6 +349,10 @@ bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb){
         int barBodyX = upperbar.coord.x + barInfo.bodyHeadDiff; //X coordinate of the left side of the bar body.
         if(abs(barBodyX-birb.midX) <birb.radius) return true;
     }
-
     return false;
+}
+
+void Game::randomForLowerBarY(int& y){
+    //Random y coordinate in a range of highestBarPos to lowestBarPos
+    y = rand() % (lowestBarPos - highestBarPos) + highestBarPos; 
 }
