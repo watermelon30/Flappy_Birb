@@ -20,7 +20,7 @@ struct Bar{
 struct BarInfo{
 	int lowerBarY; //Lowest y position of a lower bar being able to present on screen fully.
 	int barDiff; //Difference of lower and upper bar.
-	float bar_vel = -6;	//Speed from right window toward left.
+	float bar_vel = -3;	//Speed from right window toward left.
 	float barGap;	//Gap between each bar.
 	const float barGapV = 200;	//Gap between two vertical bars.
 	int barHeadH = 35;	//Height of the bar head. (Note: width is the same as image width).
@@ -62,7 +62,7 @@ private:
 	int counter=0, tempCounter=0;
 
 	float distance(int x1, int y1, int x2, int y2);
-	bool closestFromCirToRec(int x, int y, int rX, int rY, int rW, int rH, int &closestX, int &closestY);
+	bool circleRectCollision(int x, int y, int r, int rX, int rY, int rW, int rH, bool &topOfRect);
 	bool collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb);	//Function to check for collision
 
 };

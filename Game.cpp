@@ -80,11 +80,11 @@ void Game::init(const char* title, int x, int y, int width, int height){
     }
 
     //Scaling down the birb size;
-    birby.coord.w /= 10;
-    birby.coord.h /= 10;
-    birby.radius /= 10;
-    birby.midX /= 10;
-    birby.midY /= 10;
+    birby.coord.w /= 15;
+    birby.coord.h /= 15;
+    birby.radius /= 15;
+    birby.midX /= 15;
+    birby.midY /= 15;
 
     //Initialise the original coordinate
     birby.coord.y = initialY;
@@ -101,8 +101,8 @@ void Game::init(const char* title, int x, int y, int width, int height){
         return;
     }
 
-
-    barInfo.barGap = birby.coord.w * 4;
+    //Gap between each bar depends on the size of the birb
+    barInfo.barGap = birby.coord.w * 8;
 
 
     barInfo.lowerBarY = windowH - surface->h; //The y position where the lower bar will be in screen fully. 
@@ -211,7 +211,7 @@ void Game::update(){
     else tempCounter++;
 
     if(fly){
-        birby.y_vel = -20; //Flying up
+        birby.y_vel = -18; //Flying up
         fly = false;
     }
     if(!dead) birby.y_vel +=2; //Dropping 
@@ -227,20 +227,22 @@ void Game::update(){
     for(int i=0; i<6;i++){
         lowerbars[i].coord.x += barInfo.bar_vel;
         //Bar that disappeared on the screen
-        if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {  
+        if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {
             //Move to the position of the last bar plus bar gap and bar velo.  
             lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barInfo.barGap + barInfo.bar_vel;   
             lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
             upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.barDiff;
 
-            closestBar = i+1;   //The closest bar move forward.
+            closestBar = (i==5)? 0: i+1;   //The closest bar move forward.
         }
         //Move the upper bar to the top of lower bar.
         upperbars[i].coord.x = lowerbars[i].coord.x;
     }
 
     if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
+        cout << "dead" << endl;
         dead = true;
+        isRunning = false;
     }
 
 }
@@ -253,52 +255,69 @@ float Game::distance(int x1, int y1, int x2, int y2){
 
 
 
-bool Game::closestFromCirToRec(int x, int y, int rX, int rY, int rW, int rH, int &closestX, int &closestY){
-    bool betweenBar = false;
-    //Check the closest x position on the bar that is closest from bar to the point.
-    if(x < rX) closestX = rX; //Left side of the rect
-    else if(x > rX + rW) closestX = rX+rW; //Right side of the rect.
-    else {
+bool Game::circleRectCollision(int x, int y, int r, int rX, int rY, int rW, int rH, bool &topOfRect){
+    bool upperBarX = false; //To check if circle is on top of the rect in X direction
+    //bool touchX=false, touchY=false; //Check collision in x and y direction.
+    int closestX, closestY;   //Finding the closest point on the rect 
+    topOfRect = false;
+
+
+    if(x < rX) closestX = rX; //Circle is at the left side of rectangle
+    else if(x > rX + rW) closestX = rX + rW; //Circle is at the left side of rectangle
+    else { //Circle is touching rectangle in x direction.
         closestX = x;
-        betweenBar = true;
-    }  //X position of the point is the closest to the rect.
+    }
 
-    if(y < rY) closestY = rY; //Top of the rect
-    else if(y > rY + rH) closestY = rY + rH; //Bottom of the rect.
-    else closestY = y;  //Y position of the point is the closest to the bar.
 
-    return betweenBar;
+    if(x+r > rX && x-r < rX+rW) upperBarX = true;
+
+
+
+    if(y < rY) { //Circle is at the top of rectangle
+        closestY =rY;
+        /*if(y+r < rY)*/ topOfRect = upperBarX && true;    //Detecting if the point is right above the bar.
+    }
+    else if(y > rY + rH) closestY =rY+rH; //Circle is at the bottom of rectangle
+    else {
+        closestY = y;
+    }
+
+    //Check thee closest point and circle centre (This is for checking collision on the corner of rect).
+    if(distance(x, y, closestX, closestY) < float(r)) {return true; cout << "y"<<endl;}
+    
+    return false;
 }
 
 
-bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barinfo, Birb birb){
-    int midY = birb.coord.y + birb.midY;
+bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb){
+
+    int midY = birb.coord.y + birb.midY; //Getting the current centre y of the birb.
 
     //Checking for collision with bar heads.
-    int closestX, closestY;
-    bool betweenBar;
-    betweenBar = closestFromCirToRec(
-        birb.midX, midY, 
+    
+    bool aboveUpperBar, aboveLowerBar;
+
+    //Checking collision with lower bar head.
+    if(circleRectCollision(
+        birb.midX, midY, birb.radius,
         lowerbar.coord.x, lowerbar.coord.y, 
-        lowerbar.coord.w, barinfo.barHeadH,
-        closestX, closestY);
+        lowerbar.coord.w, barInfo.barHeadH,
+        aboveLowerBar)) return true; 
 
-    if(distance(birb.midX, midY, closestX, closestY) > birb.radius) return true;
 
-    closestFromCirToRec(
-        birb.midX, midY, 
-        upperbar.coord.x, upperbar.coord.y, 
-        upperbar.coord.w, barinfo.barHeadH,
-        closestX, closestY);
-
-    if(distance(birb.midX, midY, closestX, closestY) > birb.radius) return true;
-
+    //Checking collision with upper bar head.
+    if(circleRectCollision(
+        birb.midX, midY, birb.radius,
+        upperbar.coord.x, upperbar.coord.y + upperbar.coord.h - barInfo.barHeadH, //y coordinate of the bar head
+        upperbar.coord.w, barInfo.barHeadH,
+        aboveUpperBar)) return true;
 
     //Checking for collision with bar body.
-    if(!betweenBar){
-        int birbyTR_X = birb.coord.x + birb.coord.w;
-        int barBodyX = lowerbar.coord.x + barInfo.bodyHeadDiff;
-        if(birbyTR_X >barBodyX) return true;
+        //Only check when circle is on or under the heads of upper and lower bar.
+    if(aboveLowerBar == aboveUpperBar){
+        int barBodyX = upperbar.coord.x + barInfo.bodyHeadDiff; //X coordinate of the left side of the bar body.
+        if(abs(barBodyX-birb.midX) <birb.radius) return true;
     }
+
     return false;
 }
