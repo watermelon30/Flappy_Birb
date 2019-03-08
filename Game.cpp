@@ -104,9 +104,7 @@ void Game::init(const char* title, int x, int y){
     //The y position where the lower bar will be in screen fully.
     barInfo.lowerBarY = windowH - surface->h;  
 
-    highestBarPos = 100 + barInfo.barGapV; //
-
-
+    barInfo.highestBarPos = 100 + barInfo.barGapV; //
 
     //Loading bar textures. 6 for upper, 6 for lower.
     for(int i=0;i<6;i++){
@@ -155,7 +153,7 @@ void Game::init(const char* title, int x, int y){
     }
 
     textBox.color = {100,0,0};
-    surface = TTF_RenderText_Solid(textBox.font, "Press any key to start (Ctrl+F4 to exit)", textBox.color);
+    surface = TTF_RenderText_Solid(textBox.font, "Press any key to start (Atl+F4 to exit)", textBox.color);
 
     textBox.display = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_QueryTexture(textBox.display, NULL, NULL, &textBox.coord.w, &textBox.coord.h);
@@ -189,20 +187,17 @@ void Game::handleEvents(){
             }
 
             if(birby.dead){
-                birby.dead = false;
-                gameStart = true;
-                restart();
+                if(canRestart){
+                    if(event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER ||
+                       event.key.keysym.scancode == SDL_SCANCODE_RETURN){
+                        birby.dead = false;
+                        gameStart = true;
+                        restart();
+                    }
+                }
             }
             else{
                 birby.fly = true;
-                // switch (event.key.keysym.scancode)
-                // {
-                //     case SDL_SCANCODE_KP_SPACE:
-                //     case SDL_SCANCODE_UP:
-                //     // case SDL_BUTTON_LEFT:
-                //         birby.fly = true;
-                //         break;
-                // }
             }
             break;
 	}
@@ -222,7 +217,6 @@ void Game::render(){
             SDL_RenderCopyEx(renderer, upperbars[i].pic, NULL,  &upperbars[i].coord, 180, NULL, SDL_FLIP_NONE);
         }
 
-
         // SDL_RenderCopy(renderer, birby.birbPics[counter], NULL, &birby.coord);
         SDL_RenderCopyEx(renderer, birby.birbPics[counter], NULL,  &birby.coord, birby.angle, NULL, SDL_FLIP_NONE);
 
@@ -241,8 +235,6 @@ void Game::render(){
 }
 
 void Game::update(){
-
-
     if(gameStart){
         if(birby.fly){
             birby.y_vel = -18; //Flying up
@@ -257,7 +249,9 @@ void Game::update(){
             birby.y_vel = 0;
         }
 
-        if(birby.dead)dropping();
+        if(birby.dead){
+            dropping();
+        }
         else{
             if(tempCounter == 4){
                 tempCounter=0;
@@ -289,7 +283,7 @@ void Game::update(){
                     if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
                         //gameStart = false;
                         birby.dead = true;
-                        changeText("Oh no you hit the pipe");
+                        changeText("Oh shit you hit the pipe");
                         //Record the highest score.
                         if(textBox.highestScore < textBox.score) textBox.highestScore = textBox.score;
                         // isRunning = false;
@@ -301,6 +295,16 @@ void Game::update(){
                 closestBar = (closestBar==5)? 0: closestBar+1;   //The closest bar move forward.
                 textBox.score++;
                 changeText(to_string(textBox.score));
+                //Speed up the bar moving velocity and narrow the gap.
+                if(textBox.score == 10) barInfo.bar_vel--;
+                if(textBox.score == 20) {
+                    barInfo.bar_vel--; 
+                    barInfo.barGapV-=10;
+
+                }
+                if(textBox.score == 35) {barInfo.bar_vel--; barInfo.barGapV-=12;}
+                if(textBox.score == 50) {barInfo.bar_vel--; barInfo.barGapV-=15;}
+                if(textBox.score == 75) {barInfo.bar_vel--; barInfo.barGapV-=20;}
             }
         }
     }
@@ -376,7 +380,7 @@ bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb){
 
 void Game::randomForLowerBarY(int& y){
     //Random y coordinate in a range of highestBarPos to lowestBarPos
-    y = rand() % (lowestBarPos - highestBarPos) + highestBarPos; 
+    y = rand() % (barInfo.lowestBarPos - barInfo.highestBarPos) + barInfo.highestBarPos; 
 }
 
 
@@ -399,14 +403,17 @@ void Game::displayInfo(bool dead){
         SDL_Rect position;
         string info = "Score: " + to_string(textBox.score) + 
                       "\nBest:  " + to_string(textBox.highestScore) + 
-                      "\nPress any key to start again";
+                      "\nPress Enter to start again" + 
+                      "\nPress ALT+F4 to exit";
 
         //TTF_RenderText_Blended_Wrapped; Used to split and display the text in multiple lines
         surface = TTF_RenderText_Blended_Wrapped(textBox.font, info.c_str(), textBox.color, 500);
         box = SDL_CreateTextureFromSurface(renderer, surface);
         SDL_QueryTexture(box, NULL, NULL, &position.w, &position.h);
-        position.x = textBox.coord.x;
-        position.y = windowH / 2;
+        position.x = textBox.coord.x;        
+        if(infoHeight < windowH/2) infoHeight+=10;
+        else canRestart = true;
+        position.y = infoHeight;
         SDL_RenderCopy(renderer, box , NULL,  &position);
 
         SDL_FreeSurface(surface);
@@ -434,10 +441,13 @@ void Game::restart(){
     }
     
     closestBar = 0;
+    infoHeight = -300;
 
     //Reset current score.
     textBox.score = 0;
-
+    canRestart = false;
+    barInfo.barGapV = 200;
+    barInfo.bar_vel = -5;
 }
 
 

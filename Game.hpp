@@ -22,12 +22,15 @@ struct Bar{
 
 struct BarInfo{
 	int barGap;	//Gap between each bar in parallel.
-	const int barGapV = 200; //Gap between upper and lower bars.
+	int barGapV = 200; //Gap between upper and lower bars.
 	int lowerBarY; //Lowest y position of a lower bar being able to present on screen fully.
 	int headDist; //Distance of the head of lower and upper bars.
-	int bar_vel = -6;	//Speed of bars moving from right window toward left.
+	int bar_vel = -5;	//Speed of bars moving from right window toward left.
 	int barHeadH = 35;	//Height of the bar head. (Note: width is the same as image width).
 	int bodyHeadDiff = 13; //Difference of bar body and head (one side).
+
+	int highestBarPos = 350; //Highest posible lower bar position in y direction.
+	int lowestBarPos = 550; //Lowest posible lower bar position in y direction.
 };
 
 
@@ -54,15 +57,16 @@ public:
 private:
 	bool gameStart = false;
 	bool isRunning;	//False when game is finished/closed.
+	bool canRestart = false; //To delay user from restarting immediately.
+	int infoHeight = -300; //For animating the scoring info block when birby is dead.
 	const int windowH = 600, windowW = 1200;//Size of the game window.
 
 
 	//Initial position of te birby
-    const int initialX = 50;
+    const int initialX = 150;
     const int initialY = 50;
 
-	int highestBarPos = 350; //Highest posible lower bar position in y direction.
-	int lowestBarPos = 550; //Lowest posible lower bar position in y direction.
+
 
 	SDL_Window* window;
 	SDL_Renderer* renderer;
