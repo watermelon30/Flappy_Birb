@@ -18,8 +18,7 @@ Game::Game(){
 Game::~Game(){}
 
 void Game::init(const char* title, int x, int y){
-    const int initialX = 50;
-    const int initialY = 50;
+
 	window = SDL_CreateWindow("Flappy birby", x, y, windowW, windowH, 0);
     if (!window) {
     	cout << "error creating window: " << SDL_GetError() << endl;
@@ -120,7 +119,6 @@ void Game::init(const char* title, int x, int y){
         }
         //Assigning random position.
         randomForLowerBarY(lowerbars[i].coord.y);
-//        lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; 
         lowerbars[i].coord.x = windowW + i * barInfo.barGap;//windowH - upperbars[i].coord.h; 
     }
 
@@ -137,7 +135,7 @@ void Game::init(const char* title, int x, int y){
         //Upper bar needs to have a fixed distance with lower bar in y direction.
         upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
 
-        //Need to be parallel with lower bar.
+        // Need to be parallel with lower bar.
         upperbars[i].coord.x = lowerbars[i].coord.x;
     }
 
@@ -149,22 +147,22 @@ void Game::init(const char* title, int x, int y){
         cout << "error initialsing ttf library" << endl;
         return;
     }
-    score.value = 0;
-    score.font = TTF_OpenFont("resources/Roboto-Bold.ttf", 24);
-    if(!score.font){
+    textBox.score = 0;
+    textBox.font = TTF_OpenFont("resources/monoSans-Bold.otf", 30);
+    if(!textBox.font){
         cout << "error loading font: " << SDL_GetError() << endl;
         return;
     }
 
-    score.color = {100,0,0};
-    surface = TTF_RenderText_Solid(score.font, to_string(score.value).c_str(), score.color);
+    textBox.color = {100,0,0};
+    surface = TTF_RenderText_Solid(textBox.font, "Press any key to start (Ctrl+F4 to exit)", textBox.color);
 
-    score.display = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_QueryTexture(score.display, NULL, NULL, &score.coord.w, &score.coord.h);
+    textBox.display = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_QueryTexture(textBox.display, NULL, NULL, &textBox.coord.w, &textBox.coord.h);
 
     //Place the text box at the top middle of screen.
-    score.coord.x = windowW / 2 - score.coord.w / 2;
-    score.coord.y = windowH / 6;
+    textBox.coord.x = windowW / 2 - textBox.coord.w / 2;
+    textBox.coord.y = windowH / 6;
 
     SDL_FreeSurface(surface);
 
@@ -173,6 +171,7 @@ void Game::init(const char* title, int x, int y){
     isRunning = true;
     return;
 }
+
  
 
 void Game::handleEvents(){
@@ -184,13 +183,26 @@ void Game::handleEvents(){
             cout << "x clicked" << endl;
 			break;
         case SDL_KEYDOWN:
-            switch (event.key.keysym.scancode)
-            {
-                case SDL_SCANCODE_KP_SPACE:
-                case SDL_SCANCODE_UP:
-                // case SDL_BUTTON_LEFT:
-                    birby.fly = true;
-                    break;
+            if(!gameStart) {
+                changeText("Press any key to fly");
+                gameStart = true;
+            }
+
+            if(birby.dead){
+                birby.dead = false;
+                gameStart = true;
+                restart();
+            }
+            else{
+                birby.fly = true;
+                // switch (event.key.keysym.scancode)
+                // {
+                //     case SDL_SCANCODE_KP_SPACE:
+                //     case SDL_SCANCODE_UP:
+                //     // case SDL_BUTTON_LEFT:
+                //         birby.fly = true;
+                //         break;
+                // }
             }
             break;
 	}
@@ -199,20 +211,25 @@ void Game::handleEvents(){
 
 
 void Game::render(){
-
 	    // clear the window
         SDL_RenderClear(renderer);
         
         SDL_RenderCopy(renderer, background, NULL, NULL);
 
-        SDL_RenderCopy(renderer, birby.birbPics[counter], NULL, &birby.coord);
         
         for(int i=0;i<6;i++){
             SDL_RenderCopy(renderer, lowerbars[i].pic, NULL,  &lowerbars[i].coord);
             SDL_RenderCopyEx(renderer, upperbars[i].pic, NULL,  &upperbars[i].coord, 180, NULL, SDL_FLIP_NONE);
         }
 
-        SDL_RenderCopy(renderer, score.display , NULL,  &score.coord);
+
+        // SDL_RenderCopy(renderer, birby.birbPics[counter], NULL, &birby.coord);
+        SDL_RenderCopyEx(renderer, birby.birbPics[counter], NULL,  &birby.coord, birby.angle, NULL, SDL_FLIP_NONE);
+
+
+        SDL_RenderCopy(renderer, textBox.display , NULL,  &textBox.coord);
+        displayInfo(birby.dead);
+
 
         // draw the image to the window
         SDL_RenderPresent(renderer);
@@ -223,72 +240,69 @@ void Game::render(){
         return;
 }
 
-void Game::clean(){
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    cout << "Game closed" << endl;
-    return;
-}
-
-
-bool Game::running(){return isRunning;}
-
 void Game::update(){
 
-    if(tempCounter == 4){
-        tempCounter=0;
-        if(counter==3)counter = 0;
-        else counter++;
-    }
-    else tempCounter++;
 
-    if(birby.fly){
-        birby.y_vel = -18; //Flying up
-        birby.fly = false;
-    }
-    if(!birby.dead) birby.y_vel +=2; //Dropping 
-    
-     birby.coord.y += birby.y_vel;
-
-    if( birby.coord.y > windowH-birby.coord.h) {
-        birby.coord.y = windowH-birby.coord.h;
-        birby.y_vel = 0;
-    }
-
-    //Bars x positions update.
-    for(int i=0; i<6;i++){
-        lowerbars[i].coord.x += barInfo.bar_vel;
-        //Bar that disappeared on the screen
-        if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {
-            //Move to the position of the last bar plus bar gap and bar velo.  
-            lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barInfo.barGap + barInfo.bar_vel;
-            randomForLowerBarY(lowerbars[i].coord.y);
-            //lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
-            upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
-
+    if(gameStart){
+        if(birby.fly){
+            birby.y_vel = -18; //Flying up
+            birby.fly = false;
         }
-        //Move the upper bar to the top of lower bar.
-        upperbars[i].coord.x = lowerbars[i].coord.x;
-    }
+         birby.y_vel +=2; //Dropping 
+        
+        birby.coord.y += birby.y_vel;
+
+        if( birby.coord.y > windowH-birby.coord.h) {
+            birby.coord.y = windowH-birby.coord.h;
+            birby.y_vel = 0;
+        }
+
+        if(birby.dead)dropping();
+        else{
+            if(tempCounter == 4){
+                tempCounter=0;
+                if(counter==3)counter = 0;
+                else counter++;
+            }
+            else tempCounter++;
+
+            //Bars x positions update.
+            for(int i=0; i<6;i++){
+                lowerbars[i].coord.x += barInfo.bar_vel;
+                //Bar that disappeared on the screen
+                if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {
+                    //Move to the position of the last bar plus bar gap and bar velo.  
+                    lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barInfo.barGap + barInfo.bar_vel;
+                    randomForLowerBarY(lowerbars[i].coord.y);
+                    //lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
+                    upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
+                }
+                //Move the upper bar to the top of lower bar.
+                upperbars[i].coord.x = lowerbars[i].coord.x;
+            }
 
 
-    //Check if birby has passed the bar fully.
-    if(birby.midX - birby.radius < upperbars[closestBar].coord.x + upperbars[closestBar].coord.w){
-        //Checking for collision if the right of the birby is touching the bar.
-        if(birby.midX + birby.radius > upperbars[closestBar].coord.x){
-            if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
-                cout << "dead" << endl;
-                birby.dead = true;
-                isRunning = false;
+            //Check if birby has passed the bar fully.
+            if(birby.midX - birby.radius < upperbars[closestBar].coord.x + upperbars[closestBar].coord.w){
+                //Checking for collision if the right of the birby is touching the bar.
+                if(birby.midX + birby.radius > upperbars[closestBar].coord.x){
+                    if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
+                        //gameStart = false;
+                        birby.dead = true;
+                        changeText("Oh no you hit the pipe");
+                        //Record the highest score.
+                        if(textBox.highestScore < textBox.score) textBox.highestScore = textBox.score;
+                        // isRunning = false;
+                    }
+                }
+            }
+            //If passed the bar, add score and change the closest bar. 
+            else {
+                closestBar = (closestBar==5)? 0: closestBar+1;   //The closest bar move forward.
+                textBox.score++;
+                changeText(to_string(textBox.score));
             }
         }
-    }
-    //If passed the bar, add score and change the closest bar. 
-    else {
-        closestBar = (closestBar==5)? 0: closestBar+1;   //The closest bar move forward.
-        score.value++;
-        changeScore();
     }
 }
 
@@ -366,12 +380,92 @@ void Game::randomForLowerBarY(int& y){
 }
 
 
-void Game::changeScore(){
-    surface = TTF_RenderText_Solid(score.font, to_string(score.value).c_str(), score.color);
+void Game::changeText(string text){
+    surface = TTF_RenderText_Solid(textBox.font, text.c_str(), textBox.color);
 
-    score.display = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_QueryTexture(score.display, NULL, NULL, &score.coord.w, &score.coord.h);
+    textBox.display = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_QueryTexture(textBox.display, NULL, NULL, &textBox.coord.w, &textBox.coord.h);
+    textBox.coord.x = windowW / 2 - textBox.coord.w / 2;
 
     SDL_FreeSurface(surface);
+}
+
+
+
+void Game::displayInfo(bool dead){
+    //Only display info when the birb is dead.
+    if(dead){
+        SDL_Texture* box;
+        SDL_Rect position;
+        string info = "Score: " + to_string(textBox.score) + 
+                      "\nBest:  " + to_string(textBox.highestScore) + 
+                      "\nPress any key to start again";
+
+        //TTF_RenderText_Blended_Wrapped; Used to split and display the text in multiple lines
+        surface = TTF_RenderText_Blended_Wrapped(textBox.font, info.c_str(), textBox.color, 500);
+        box = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_QueryTexture(box, NULL, NULL, &position.w, &position.h);
+        position.x = textBox.coord.x;
+        position.y = windowH / 2;
+        SDL_RenderCopy(renderer, box , NULL,  &position);
+
+        SDL_FreeSurface(surface);
+        SDL_DestroyTexture(box);
+    }
+}
+
+void Game::restart(){
+    changeText("Press any key to fly");
+
+    //Replace te position of the birby.
+    
+    birby.coord.x = initialX;
+    birby.coord.y = initialY;
+    birby.angle = 0;
+
+    //Initialise all the bar coordinate.
+    for(int i=0;i<6;i++){
+        randomForLowerBarY(lowerbars[i].coord.y);
+        lowerbars[i].coord.x = windowW + i * barInfo.barGap;//windowH - upperbars[i].coord.h; 
+    }
+    for(int i=0;i<6;i++){
+        upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
+        upperbars[i].coord.x = lowerbars[i].coord.x;
+    }
+    
+    closestBar = 0;
+
+    //Reset current score.
+    textBox.score = 0;
 
 }
+
+
+
+void Game::clean(){
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    cout << "Game closed" << endl;
+    return;
+}
+
+
+void Game::dropping(){
+    //No need to rotate.
+    if(birby.angle >= 90){
+        birby.angle = 90;
+        return;
+    }
+    //Birb still going up.
+    if(birby.y_vel <= 0) return;
+
+    int height = windowH - birby.coord.y + 1 ; //Distance to the ground. Plus one to prevent the denominator as zero.
+
+    int t = (height / birby.y_vel) + 1; //Time to hit the ground. Plus one to prevent the denominator as zero.
+    int remainAngle = 90-birby.angle;
+    birby.angle += (int) (remainAngle / t); 
+    return;   
+}
+
+bool Game::running(){return isRunning;}

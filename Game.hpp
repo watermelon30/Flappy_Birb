@@ -1,15 +1,17 @@
 #include <stdio.h>
+#include <string>
 #include "SDL2/SDL.h"
 #include <SDL2/SDL_ttf.h>
 
 
 struct Birb{
+	int angle = 0;
 	bool fly = false, dead = false;
 	int midX = 432, midY = 285; //Approximate middle of the birby. 
 	int radius = 277; //Radius of the birby picture
 	SDL_Texture* birbPics[4];
 	SDL_Rect coord; // struct to hold the position and size of the sprite
-	float y_vel;
+	int y_vel;
 };
 
 
@@ -23,14 +25,14 @@ struct BarInfo{
 	const int barGapV = 200; //Gap between upper and lower bars.
 	int lowerBarY; //Lowest y position of a lower bar being able to present on screen fully.
 	int headDist; //Distance of the head of lower and upper bars.
-	float bar_vel = -6;	//Speed of bars moving from right window toward left.
+	int bar_vel = -6;	//Speed of bars moving from right window toward left.
 	int barHeadH = 35;	//Height of the bar head. (Note: width is the same as image width).
 	int bodyHeadDiff = 13; //Difference of bar body and head (one side).
 };
 
 
-struct Score{
-	int value = 0;
+struct TextBox{
+	int score = 0;
 	int highestScore = 0;
 	SDL_Texture* display;
 	TTF_Font* font;
@@ -50,9 +52,14 @@ public:
 	void update();
 	bool running();
 private:
+	bool gameStart = false;
 	bool isRunning;	//False when game is finished/closed.
 	const int windowH = 600, windowW = 1200;//Size of the game window.
 
+
+	//Initial position of te birby
+    const int initialX = 50;
+    const int initialY = 50;
 
 	int highestBarPos = 350; //Highest posible lower bar position in y direction.
 	int lowestBarPos = 550; //Lowest posible lower bar position in y direction.
@@ -66,7 +73,7 @@ private:
 	Bar upperbars[6];	//Bars at the upper window.
 	Bar lowerbars[6];	//Bars at the lower window.
 	BarInfo barInfo;
-	Score score;
+	TextBox textBox;
 
 
 
@@ -78,7 +85,10 @@ private:
 	bool circleRectCollision(int x, int y, int r, int rX, int rY, int rW, int rH, bool &topOfRect);
 	bool collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb);	//Function to check for collision
 	void randomForLowerBarY(int &y);
-	void changeScore();
+	void changeText(std::string text);
+	void displayInfo(bool display);
+	void restart();
+	void dropping();
 
 };
 

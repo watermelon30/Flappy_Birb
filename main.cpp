@@ -17,10 +17,7 @@ int main(){
 		game->update();
 		game->render();
 	}
-    SDL_Delay(3000);
-
 	game->clean();
-
 	return 0;
 
 }
