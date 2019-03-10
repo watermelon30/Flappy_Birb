@@ -4,21 +4,38 @@
 #include <time.h>       /* time */
 #include <math.h>
 #include <iostream>
+#include <fstream>
 #include "SDL2/SDL.h"
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 
 using namespace std;
 
-
-
 Game::Game(){
     srand(time(NULL));
+    ifstream file;
+    file.open(scoreFile);
+    if(!file.good()){
+        cout << "Error reading high score info (located in resources directory)." << endl;
+        exit(0);
+    }
+    string temp;
+    getline(file, temp);
+    try{
+        textBox.highestScore = stoi(temp);
+    } catch (invalid_argument & e){
+        cout << "Error parsing the highscore file" << endl;
+        exit(0);
+    }
+    file.close();
 }
+
 Game::~Game(){}
 
+//Initialise the game state and corresponding variables.
 void Game::init(const char* title, int x, int y){
 
+    //Creating game window.
 	window = SDL_CreateWindow("Flappy birby", x, y, windowW, windowH, 0);
     if (!window) {
     	cout << "error creating window: " << SDL_GetError() << endl;
@@ -26,7 +43,8 @@ void Game::init(const char* title, int x, int y){
 	    return;
     }
 
-    Uint32 render_flags = SDL_RENDERER_ACCELERATED;
+    //Creating renderer object for handling rendering.
+    Uint32 render_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
 	renderer = SDL_CreateRenderer(window, -1, render_flags);
     if (!renderer){
     	cout << "error creating renderer: " << SDL_GetError() << endl;
@@ -35,7 +53,7 @@ void Game::init(const char* title, int x, int y){
 		return;
     }
 
-    //Loading background image.
+    //Loading background image into the SDL surface..
     surface = IMG_Load("resources/background.png");
     if (!surface){
         cout << "error loading background picture: " << SDL_GetError() << endl;
@@ -43,9 +61,9 @@ void Game::init(const char* title, int x, int y){
         return;
     }
 
-    // load the image data into the graphics hardware's memory
+    //Loading background image data into the graphics hardware's memory
     background = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_FreeSurface(surface);
+    SDL_FreeSurface(surface);   //Freeing memory
     if (!background){
         cout << "error creating background: " << SDL_GetError() << endl;
         clean();
@@ -53,7 +71,7 @@ void Game::init(const char* title, int x, int y){
     }
 
 
-    //Loading birby image.
+    //Loading the birb images.
     for(int i=0;i<4;i++){
         string path = "resources/birb" + to_string(i) + ".png";
         surface = IMG_Load(path.c_str());
@@ -62,19 +80,16 @@ void Game::init(const char* title, int x, int y){
             clean();
             return;
         }
-
         birby.birbPics[i] = SDL_CreateTextureFromSurface(renderer, surface);
-        SDL_FreeSurface(surface);
 
         if (!birby.birbPics[i]){
-            cout << "error creating birb: " << SDL_GetError() << endl;
+            cout << "error creating texture for birb: " << SDL_GetError() << endl;
             clean();
             return;
         }
-        // struct to hold the position and size of the sprite
-        // get the dimensions of texture
+
+        //Getting the dimensions of birb.
         SDL_QueryTexture(birby.birbPics[i], NULL, NULL, &birby.coord.w, &birby.coord.h);
-        //cout << coord.h << " " << coord.w;
     }
 
     //Scaling down the birb size;
@@ -87,7 +102,7 @@ void Game::init(const char* title, int x, int y){
     //Initialise the original coordinate
     birby.coord.y = initialY;
     birby.coord.x = initialX;
-    birby.midX += initialX; //x position of the middle of the birby. Will never change afterward.
+    birby.midX += initialX; //x position of the middle of the birby. Will never be changed afterward.
     
 
     //Loading pipe image.
@@ -98,61 +113,54 @@ void Game::init(const char* title, int x, int y){
         return;
     }
 
-    //Gap between each bar depends on the size of the birb
-    barInfo.barGap = birby.coord.w * 8;
+    //Gap between each pipe depends on the size of the birb
+    pipeInfo.pipeGap = birby.coord.w * 8;
 
-    //The y position where the lower bar will be in screen fully.
-    barInfo.lowerBarY = windowH - surface->h;  
-
-    barInfo.highestBarPos = 100 + barInfo.barGapV; //
-
-    //Loading bar textures. 6 for upper, 6 for lower.
+    //Loading lower pipe textures.
     for(int i=0;i<6;i++){
-        lowerbars[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
-        SDL_QueryTexture(lowerbars[i].pic, NULL, NULL, &lowerbars[i].coord.w, &lowerbars[i].coord.h);
-        if (!lowerbars[i].pic){
-            cout << "error creating lowerbars: " << SDL_GetError() << endl;
+        lowerpipes[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_QueryTexture(lowerpipes[i].pic, NULL, NULL, &lowerpipes[i].coord.w, &lowerpipes[i].coord.h);
+        if (!lowerpipes[i].pic){
+            cout << "error creating lowerpipes: " << SDL_GetError() << endl;
             clean();
             return;
         }
         //Assigning random position.
-        randomForLowerBarY(lowerbars[i].coord.y);
-        lowerbars[i].coord.x = windowW + i * barInfo.barGap;//windowH - upperbars[i].coord.h; 
+        randomForLowerPipeY(lowerpipes[i].coord.y);
+        lowerpipes[i].coord.x = windowW + i * pipeInfo.pipeGap;//Alignning each pipe with fixed distance 
     }
 
-    barInfo.headDist = lowerbars[0].coord.h +barInfo.barGapV;
+    pipeInfo.headDist = lowerpipes[0].coord.h +pipeInfo.pipeGapV;   //Pipe height + gap of two pipes. 
 
+    //Loading upper pipe textures.
     for(int i=0;i<6;i++){
-        upperbars[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
-        SDL_QueryTexture(upperbars[i].pic, NULL, NULL, &upperbars[i].coord.w, &upperbars[i].coord.h);
-        if (!upperbars[i].pic){
-            cout << "error creating upperbars: " << SDL_GetError() << endl;
+        upperpipes[i].pic = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_QueryTexture(upperpipes[i].pic, NULL, NULL, &upperpipes[i].coord.w, &upperpipes[i].coord.h);
+        if (!upperpipes[i].pic){
+            cout << "error creating upperpipes: " << SDL_GetError() << endl;
             clean();
             return;
         }
-        //Upper bar needs to have a fixed distance with lower bar in y direction.
-        upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
+        //Upper pipe needs to have a fixed distance with lower pipe in y direction.
+        upperpipes[i].coord.y = lowerpipes[i].coord.y - pipeInfo.headDist;
 
-        // Need to be parallel with lower bar.
-        upperbars[i].coord.x = lowerbars[i].coord.x;
+        // Need to be parallel with lower pipe.
+        upperpipes[i].coord.x = lowerpipes[i].coord.x;
     }
 
-    SDL_FreeSurface(surface);
-
-
+    //Setting up the text.
     //Initialise sdl ttf library.
     if(TTF_Init()== -1){
         cout << "error initialsing ttf library" << endl;
         return;
     }
-    textBox.score = 0;
+    //Loading font
     textBox.font = TTF_OpenFont("resources/monoSans-Bold.otf", 30);
     if(!textBox.font){
         cout << "error loading font: " << SDL_GetError() << endl;
         return;
     }
 
-    textBox.color = {100,0,0};
     surface = TTF_RenderText_Solid(textBox.font, "Press any key to start (Atl+F4 to exit)", textBox.color);
 
     textBox.display = SDL_CreateTextureFromSurface(renderer, surface);
@@ -162,32 +170,35 @@ void Game::init(const char* title, int x, int y){
     textBox.coord.x = windowW / 2 - textBox.coord.w / 2;
     textBox.coord.y = windowH / 6;
 
+    //Freeing the surface from memory.
     SDL_FreeSurface(surface);
 
-    //SDL_SetRenderDrawColor(renderer, 255,255,255,100);
-    // circleColor(renderer, 0, 0, 50, 0x008800);
+    //Start running the game.
     isRunning = true;
     return;
 }
 
  
-
+//Event handler
 void Game::handleEvents(){
 	SDL_Event event;
 	SDL_PollEvent(&event);
 	switch(event.type){
 		case SDL_QUIT:
 			isRunning = false;
-            cout << "x clicked" << endl;
+
 			break;
         case SDL_KEYDOWN:
+            //Start game event
             if(!gameStart) {
                 changeText("Press any key to fly");
                 gameStart = true;
             }
 
+            //Restart event
             if(birby.dead){
                 if(canRestart){
+                    //restart game when Enter is pressed.
                     if(event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER ||
                        event.key.keysym.scancode == SDL_SCANCODE_RETURN){
                         birby.dead = false;
@@ -196,7 +207,7 @@ void Game::handleEvents(){
                     }
                 }
             }
-            else{
+            else{   //birb flies
                 birby.fly = true;
             }
             break;
@@ -204,122 +215,157 @@ void Game::handleEvents(){
 	return;
 }
 
-
+//Rendering
 void Game::render(){
-	    // clear the window
-        SDL_RenderClear(renderer);
-        
-        SDL_RenderCopy(renderer, background, NULL, NULL);
+    // clear the window
+    SDL_RenderClear(renderer);
+    
+    //Draw background
+    SDL_RenderCopy(renderer, background, NULL, NULL);
 
-        
-        for(int i=0;i<6;i++){
-            SDL_RenderCopy(renderer, lowerbars[i].pic, NULL,  &lowerbars[i].coord);
-            SDL_RenderCopyEx(renderer, upperbars[i].pic, NULL,  &upperbars[i].coord, 180, NULL, SDL_FLIP_NONE);
-        }
+    //Draw pipes
+    for(int i=0;i<6;i++){
+        SDL_RenderCopy(renderer, lowerpipes[i].pic, NULL,  &lowerpipes[i].coord);
+        //Need to rotate the upper bar with 180 degrees.
+        SDL_RenderCopyEx(renderer, upperpipes[i].pic, NULL,  &upperpipes[i].coord, 180, NULL, SDL_FLIP_NONE); 
+    }
 
-        // SDL_RenderCopy(renderer, birby.birbPics[counter], NULL, &birby.coord);
-        SDL_RenderCopyEx(renderer, birby.birbPics[counter], NULL,  &birby.coord, birby.angle, NULL, SDL_FLIP_NONE);
+    //Draw birby.
+    SDL_RenderCopyEx(renderer, birby.birbPics[counter], NULL,  &birby.coord, birby.angle, NULL, SDL_FLIP_NONE);
+
+    //Draw text box.
+    SDL_RenderCopy(renderer, textBox.display , NULL,  &textBox.coord);
+
+    //Display scoring info when birby hit the pipe.
+    displayInfo(birby.dead);
 
 
-        SDL_RenderCopy(renderer, textBox.display , NULL,  &textBox.coord);
-        displayInfo(birby.dead);
+    //Actual rendering
+    SDL_RenderPresent(renderer);
 
+    // wait 1/60th of a second (60 fps)
+    SDL_Delay(1000/60);
 
-        // draw the image to the window
-        SDL_RenderPresent(renderer);
-
-        // wait 1/60th of a second
-        SDL_Delay(1000/60);
-
-        return;
+    return;
 }
 
+//Updating game state.
 void Game::update(){
+    //Birb always flying as long as not dead.
+    if(!birby.dead){
+        if(tempCounter == 4){
+            tempCounter=0;
+            if(counter==3)counter = 0;
+            else counter++;
+        }
+        else tempCounter++;
+    }
+
     if(gameStart){
         if(birby.fly){
             birby.y_vel = -18; //Flying up
             birby.fly = false;
         }
-         birby.y_vel +=2; //Dropping 
+        else birby.y_vel +=2; //Dropping 
         
         birby.coord.y += birby.y_vel;
 
+        //Let the birby stay on the ground.
         if( birby.coord.y > windowH-birby.coord.h) {
             birby.coord.y = windowH-birby.coord.h;
             birby.y_vel = 0;
         }
 
-        if(birby.dead){
-            dropping();
-        }
+        //Face down the birby when dying.
+        if(birby.dead) dropping();
         else{
-            if(tempCounter == 4){
-                tempCounter=0;
-                if(counter==3)counter = 0;
-                else counter++;
-            }
-            else tempCounter++;
-
-            //Bars x positions update.
+            //Pipes update.
             for(int i=0; i<6;i++){
-                lowerbars[i].coord.x += barInfo.bar_vel;
-                //Bar that disappeared on the screen
-                if(lowerbars[i].coord.x < -lowerbars[i].coord.w) {
-                    //Move to the position of the last bar plus bar gap and bar velo.  
-                    lowerbars[i].coord.x = lowerbars[(i+5)%6].coord.x + barInfo.barGap + barInfo.bar_vel;
-                    randomForLowerBarY(lowerbars[i].coord.y);
-                    //lowerbars[i].coord.y = barInfo.lowerBarY + rand()%randomRange; //Randomly assign a valid position.            
-                    upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
+                lowerpipes[i].coord.x += pipeInfo.pipe_vel;
+
+                //Pipe that disappeared on the screen
+                if(lowerpipes[i].coord.x < -lowerpipes[i].coord.w) {
+                    //Move to the position of the previous pipe plus pipe gap and pipe velo.
+                    lowerpipes[i].coord.x = lowerpipes[(i+5)%6].coord.x + pipeInfo.pipeGap + pipeInfo.pipe_vel;                    
+
+                    //Reassigning the pipes' y position.
+                    randomForLowerPipeY(lowerpipes[i].coord.y);
+                    upperpipes[i].coord.y = lowerpipes[i].coord.y - pipeInfo.headDist;
                 }
-                //Move the upper bar to the top of lower bar.
-                upperbars[i].coord.x = lowerbars[i].coord.x;
+                //Move the upper pipe to the top of lower pipe.
+                upperpipes[i].coord.x = lowerpipes[i].coord.x;
             }
 
-
-            //Check if birby has passed the bar fully.
-            if(birby.midX - birby.radius < upperbars[closestBar].coord.x + upperbars[closestBar].coord.w){
-                //Checking for collision if the right of the birby is touching the bar.
-                if(birby.midX + birby.radius > upperbars[closestBar].coord.x){
-                    if(collision(upperbars[closestBar],lowerbars[closestBar], barInfo, birby)){
-                        //gameStart = false;
+            //Check if birby has passed the pipe fully.
+            if(birby.coord.x < upperpipes[closestPipe].coord.x + upperpipes[closestPipe].coord.w){
+                //Checking the collision if the right of the birby is touching the pipe.
+                if(birby.coord.x+birby.coord.w > upperpipes[closestPipe].coord.x){
+                    if(collision(upperpipes[closestPipe],lowerpipes[closestPipe], pipeInfo, birby)){
                         birby.dead = true;
-                        changeText("Oh shit you hit the pipe");
+                        changeText("Oh no you hit the pipe");
                         //Record the highest score.
-                        if(textBox.highestScore < textBox.score) textBox.highestScore = textBox.score;
-                        // isRunning = false;
+                        if(textBox.highestScore < textBox.score) {
+                            textBox.highestScore = textBox.score;   
+                            ofstream file(scoreFile, ofstream::out|ofstream::trunc);
+                            if(!file.good()){
+                                cout << "Unable to open the high score file" << endl;
+                                exit(0);
+                            }
+                            file << textBox.highestScore;
+                            file.close();
+                        }
                     }
                 }
             }
-            //If passed the bar, add score and change the closest bar. 
+            //If passed the pipe, add score and change the closest pipe index. 
             else {
-                closestBar = (closestBar==5)? 0: closestBar+1;   //The closest bar move forward.
+                closestPipe = (closestPipe==5)? 0: closestPipe+1;   //The closest pipe move forward.
                 textBox.score++;
                 changeText(to_string(textBox.score));
-                //Speed up the bar moving velocity and narrow the gap.
-                if(textBox.score == 10) barInfo.bar_vel--;
-                if(textBox.score == 20) {
-                    barInfo.bar_vel--; 
-                    barInfo.barGapV-=10;
 
+                //Speed up the pipe velocity and narrower the gap when passed a certain score.
+                if(textBox.score == 10) pipeInfo.pipe_vel--;
+                if(textBox.score == 25) {
+                    pipeInfo.pipe_vel--; 
+                    pipeInfo.headDist-=6;
                 }
-                if(textBox.score == 35) {barInfo.bar_vel--; barInfo.barGapV-=12;}
-                if(textBox.score == 50) {barInfo.bar_vel--; barInfo.barGapV-=15;}
-                if(textBox.score == 75) {barInfo.bar_vel--; barInfo.barGapV-=20;}
+                if(textBox.score == 40) {
+                    pipeInfo.pipe_vel--; 
+                    pipeInfo.headDist-=8;
+                }
+                if(textBox.score == 55) {
+                    pipeInfo.pipe_vel--; 
+                    pipeInfo.headDist-=10;
+                }
+                if(textBox.score == 75) {
+                    pipeInfo.pipe_vel--; 
+                    pipeInfo.headDist-=10;
+                }
             }
         }
     }
 }
 
+//Distance of two points.
 float Game::distance(int x1, int y1, int x2, int y2){
     int dx = x1 - x2;
     int dy = y1 - y2;
     return sqrt(dx*dx + dy*dy);
 }
 
+
+/**
+ * This function checks the collision with a circle and a rectangle.
+ * @params x, y: Centre of the circle.
+ * @param r: Radius of the circle.
+ * @params rX, rY: Top left corner coordinate of the rectangle. 
+ * @params rW, rH: Width and Height of the rectangle. 
+ * @param topOfRect: To check if the circle is on top of the rectangle.
+ * return:Whether collision occurs
+ */
 bool Game::circleRectCollision(int x, int y, int r, int rX, int rY, int rW, int rH, bool &topOfRect){
     int closestX, closestY;   //Finding the closest point on the rect 
     topOfRect = false;
-
 
     //Finding the closest x position from rect body to circle centre.
     if(x < rX) closestX = rX; //Circle is at the left side of rectangle
@@ -331,7 +377,7 @@ bool Game::circleRectCollision(int x, int y, int r, int rX, int rY, int rW, int 
     //Finding the closest y position from rect body to circle centre.
     if(y < rY) { //Circle is on top of rectangle
         closestY =rY;
-        topOfRect = true;    //Detecting if the point is right above the bar.
+        topOfRect = true;    //Detecting if the point is right above the pipe.
     }
     else if(y > rY + rH) closestY =rY+rH; //Circle is at the bottom of rectangle
     else {  //Circle is touching rectangle in y direction.
@@ -345,45 +391,44 @@ bool Game::circleRectCollision(int x, int y, int r, int rX, int rY, int rW, int 
 }
 
 
-bool Game::collision(Bar upperbar, Bar lowerbar, BarInfo barInfo, Birb birb){
+//Check if the birby has hit the pipe.
+//Return: Whether collision occurs with pipes.
+bool Game::collision(Pipe upperpipe, Pipe lowerpipe, PipeInfo pipeInfo, Birb birb){
 
     int midY = birb.coord.y + birb.midY; //Getting the current centre y of the birb.
 
+    bool aboveUpperPipe, aboveLowerPipe; //To check whether the position of the birb is above the pipe heads.
 
-
-    bool aboveUpperBar, aboveLowerBar; //To check whether the position of the birb is above the bar heads.
-
-    //Checking collision with lower bar head.
+    //Checking collision with lower pipe head.
     if(circleRectCollision(
         birb.midX, midY, birb.radius,
-        lowerbar.coord.x, lowerbar.coord.y, 
-        lowerbar.coord.w, barInfo.barHeadH,
-        aboveLowerBar)) return true; 
+        lowerpipe.coord.x, lowerpipe.coord.y, 
+        lowerpipe.coord.w, pipeInfo.pipeHeadH,
+        aboveLowerPipe)) return true; 
 
-
-    //Checking collision with upper bar head.
+    //Checking collision with upper pipe head.
     if(circleRectCollision(
         birb.midX, midY, birb.radius,
-        upperbar.coord.x, upperbar.coord.y + upperbar.coord.h - barInfo.barHeadH, //y coordinate of the bar head
-        upperbar.coord.w, barInfo.barHeadH,
-        aboveUpperBar)) return true;
+        upperpipe.coord.x, upperpipe.coord.y + upperpipe.coord.h - pipeInfo.pipeHeadH, //y coordinate of the pipe head
+        upperpipe.coord.w, pipeInfo.pipeHeadH,
+        aboveUpperPipe)) return true;
 
-    //Checking for collision with bar body when birby position is not inside upper and lower bar heads.
-    if(aboveLowerBar == aboveUpperBar){
-        int barBodyX = upperbar.coord.x + barInfo.bodyHeadDiff; //X coordinate of the left side of the bar body.
-        if(abs(barBodyX-birb.midX) <birb.radius) return true;
+    //Checking for collision with pipe body when birby y position is not inside upper and lower pipe heads.
+    if(aboveLowerPipe == aboveUpperPipe){
+        int pipeBodyX = upperpipe.coord.x + pipeInfo.bodyHeadDiff; //X coordinate of the left side of the pipe body.
+        if(abs(pipeBodyX-birb.midX) < birb.radius) return true;
     }
     return false;
 }
 
-
-
-void Game::randomForLowerBarY(int& y){
-    //Random y coordinate in a range of highestBarPos to lowestBarPos
-    y = rand() % (barInfo.lowestBarPos - barInfo.highestBarPos) + barInfo.highestBarPos; 
+//Assigning a random position within a range for lower pipe.
+void Game::randomForLowerPipeY(int& y){
+    //Random y coordinate in a range of highestLowPipePos to lowestLowPipePos
+    y = rand() % (pipeInfo.lowestLowPipePos - pipeInfo.highestLowPipePos) + pipeInfo.highestLowPipePos; 
 }
 
 
+//Changing the text of the textbox.
 void Game::changeText(string text){
     surface = TTF_RenderText_Solid(textBox.font, text.c_str(), textBox.color);
 
@@ -394,10 +439,8 @@ void Game::changeText(string text){
     SDL_FreeSurface(surface);
 }
 
-
-
+//Display scoring info only when the birb is dead.
 void Game::displayInfo(bool dead){
-    //Only display info when the birb is dead.
     if(dead){
         SDL_Texture* box;
         SDL_Rect position;
@@ -415,12 +458,12 @@ void Game::displayInfo(bool dead){
         else canRestart = true;
         position.y = infoHeight;
         SDL_RenderCopy(renderer, box , NULL,  &position);
-
         SDL_FreeSurface(surface);
         SDL_DestroyTexture(box);
     }
 }
 
+//Reset the cooresponding varibales to the default value.
 void Game::restart(){
     changeText("Press any key to fly");
 
@@ -430,30 +473,35 @@ void Game::restart(){
     birby.coord.y = initialY;
     birby.angle = 0;
 
-    //Initialise all the bar coordinate.
+    //Restart the gap between two pipes
+    pipeInfo.headDist = lowerpipes[0].coord.h +pipeInfo.pipeGapV;   //Pipe height + gap of two pipes. 
+    //Reset the pipe velocity.
+    pipeInfo.pipe_vel = -5;
+
+    //Initialise all the pipe coordinate.
     for(int i=0;i<6;i++){
-        randomForLowerBarY(lowerbars[i].coord.y);
-        lowerbars[i].coord.x = windowW + i * barInfo.barGap;//windowH - upperbars[i].coord.h; 
+        randomForLowerPipeY(lowerpipes[i].coord.y);
+        lowerpipes[i].coord.x = windowW + i * pipeInfo.pipeGap;//windowH - upperpipes[i].coord.h; 
     }
     for(int i=0;i<6;i++){
-        upperbars[i].coord.y = lowerbars[i].coord.y - barInfo.headDist;
-        upperbars[i].coord.x = lowerbars[i].coord.x;
+        upperpipes[i].coord.y = lowerpipes[i].coord.y - pipeInfo.headDist;
+        upperpipes[i].coord.x = lowerpipes[i].coord.x;
     }
     
-    closestBar = 0;
+    closestPipe = 0;
     infoHeight = -300;
 
     //Reset current score.
     textBox.score = 0;
     canRestart = false;
-    barInfo.barGapV = 200;
-    barInfo.bar_vel = -5;
 }
 
 
-
+//Clean up the necessary objects and quit.
 void Game::clean(){
-    SDL_DestroyRenderer(renderer);
+    //TODO: Check high score history.
+
+    SDL_DestroyRenderer(renderer);  //This will free all textures.
     SDL_DestroyWindow(window);
     SDL_Quit();
     cout << "Game closed" << endl;
@@ -461,8 +509,9 @@ void Game::clean(){
 }
 
 
+//To produce the face down animation of the birby.
 void Game::dropping(){
-    //No need to rotate.
+    //Birby has already faced down.
     if(birby.angle >= 90){
         birby.angle = 90;
         return;

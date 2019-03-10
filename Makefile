@@ -6,13 +6,13 @@ CC := g++
 # set the compiler flags
 CFLAGS := `sdl2-config --libs --cflags` -ggdb3 -O0 -Wall -lSDL2_image -lSDL2_ttf -lm
 
-# add header files here
+# header files
 HDRS := Game.hpp
 
-# add source files here
+# source files
 SRCS := Game.cpp main.cpp
 
-# generate names of object files
+# names of object files
 OBJS := $(SRCS:.c=.o)
 
 # name of executable
