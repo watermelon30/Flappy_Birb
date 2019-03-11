@@ -1,9 +1,7 @@
-# A simple Makefile for compiling small SDL projects
-
 # compiler
 CC := g++
 
-# set the compiler flags
+# compiler flags
 CFLAGS := `sdl2-config --libs --cflags` -ggdb3 -O0 -Wall -lSDL2_image -lSDL2_ttf -lm
 
 # header files
@@ -25,12 +23,8 @@ all: $(EXEC)
 $(EXEC): $(OBJS) $(HDRS) Makefile
 	$(CC) -o $@ $(OBJS) $(CFLAGS)
 
-# recipe for building object files
-#$(OBJS): $(@:.o=.c) $(HDRS) Makefile
-#	$(CC) -o $@ $(@:.o=.c) -c $(CFLAGS)
-
 # recipe to clean the workspace
 clean:
-	rm -f $(EXEC) $(OBJS)
+	rm -f $(EXEC)
 
 .PHONY: all clean

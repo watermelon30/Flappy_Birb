@@ -1,16 +1,22 @@
+/**
+ * This is the main game file that contains every faunctionality this game has.
+ */
+
 #include "Game.hpp"
 #include <stdio.h>
 #include <stdlib.h> 
-#include <time.h>       /* time */
+#include <time.h>
 #include <math.h>
 #include <iostream>
-#include <fstream>
-#include "SDL2/SDL.h"
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
+#include <fstream> //Read/write files
+#include "SDL2/SDL.h" //SDL rendering library
+#include <SDL2/SDL_image.h> //Loading image
+#include <SDL2/SDL_ttf.h>   //Text
 
 using namespace std;
 
+
+//Constructor. Read the high score file.
 Game::Game(){
     srand(time(NULL));
     ifstream file;
@@ -30,6 +36,7 @@ Game::Game(){
     file.close();
 }
 
+//Destructor
 Game::~Game(){}
 
 //Initialise the game state and corresponding variables.
@@ -53,7 +60,8 @@ void Game::init(const char* title, int x, int y){
 		return;
     }
 
-    //Loading background image into the SDL surface..
+    //Loading background image into the SDL surface.
+    //Source of the background image: https://opengameart.org/content/background-land
     surface = IMG_Load("resources/background.png");
     if (!surface){
         cout << "error loading background picture: " << SDL_GetError() << endl;
@@ -72,6 +80,8 @@ void Game::init(const char* title, int x, int y){
 
 
     //Loading the birb images.
+    // Source of the birb image:
+    // https://opengameart.org/content/free-game-asset-grumpy-flappy-bird-sprite-sheets 
     for(int i=0;i<4;i++){
         string path = "resources/birb" + to_string(i) + ".png";
         surface = IMG_Load(path.c_str());
@@ -105,7 +115,7 @@ void Game::init(const char* title, int x, int y){
     birby.midX += initialX; //x position of the middle of the birby. Will never be changed afterward.
     
 
-    //Loading pipe image.
+    //Loading pipe image. Drawn by myself0
     surface = IMG_Load("resources/pipe.png");
     if (!surface){
         cout << "error loading pipe picture: " << SDL_GetError() << endl;
@@ -527,4 +537,5 @@ void Game::dropping(){
     return;   
 }
 
+//Indicating whether the game is running.
 bool Game::running(){return isRunning;}

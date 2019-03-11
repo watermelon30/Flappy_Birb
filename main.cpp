@@ -1,11 +1,10 @@
+/**
+ * Main file. The whole source code of the game can be found in my github account:
+ * https://github.com/watermelon30/Flappy_Birb
+*/
 #include "Game.hpp"
 #include <iostream>
 #include <stdio.h>
-
-
-
-// #define WINDOW_WIDTH (1200)
-// #define WINDOW_HEIGHT (600)
 
 
 int main(){
