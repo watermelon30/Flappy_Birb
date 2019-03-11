@@ -34,8 +34,8 @@ struct PipeInfo{
 	int pipeHeadH = 35;	//Height of the pipe head. (Note: width is the same as image width).
 	int bodyHeadDiff = 13; //Difference of pipe body and head (one side).
 
-	int highestLowPipePos = 250; //Highest posible lower pipe position in y direction. (50 + pipeGapV)
-	int lowestLowPipePos = 550; //Lowest posible lower pipe position in y direction. (50 pixel above boundary)
+	int highestLowPipePos = 250; //Highest possible lower pipe position in y direction. (50 + pipeGapV)
+	int lowestLowPipePos = 550; //Lowest possible lower pipe position in y direction. (50 pixel above boundary)
 };
 
 
@@ -76,7 +76,7 @@ private:
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 
-	SDL_Surface* surface; //For loeading images to sdl surface
+	SDL_Surface* surface; //For loading images to sdl surface
 	SDL_Texture* background;
 
 	Birb birby;	//Birb object;

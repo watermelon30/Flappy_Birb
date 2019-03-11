@@ -1,5 +1,5 @@
 /**
- * This is the main game file that contains every faunctionality this game has.
+ * This is the main game file that contains every functionality this game has.
  */
 
 #include "Game.hpp"
@@ -115,7 +115,7 @@ void Game::init(const char* title, int x, int y){
     birby.midX += initialX; //x position of the middle of the birby. Will never be changed afterward.
     
 
-    //Loading pipe image. Drawn by myself0
+    //Loading pipe image. Drawn by myself.
     surface = IMG_Load("resources/pipe.png");
     if (!surface){
         cout << "error loading pipe picture: " << SDL_GetError() << endl;
@@ -137,7 +137,7 @@ void Game::init(const char* title, int x, int y){
         }
         //Assigning random position.
         randomForLowerPipeY(lowerpipes[i].coord.y);
-        lowerpipes[i].coord.x = windowW + i * pipeInfo.pipeGap;//Alignning each pipe with fixed distance 
+        lowerpipes[i].coord.x = windowW + i * pipeInfo.pipeGap;//Aligning each pipe with fixed distance 
     }
 
     pipeInfo.headDist = lowerpipes[0].coord.h +pipeInfo.pipeGapV;   //Pipe height + gap of two pipes. 
@@ -473,7 +473,7 @@ void Game::displayInfo(bool dead){
     }
 }
 
-//Reset the cooresponding varibales to the default value.
+//Reset the cooresponding variables to the default value.
 void Game::restart(){
     changeText("Press any key to fly");
 
