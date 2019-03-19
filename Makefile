@@ -11,7 +11,7 @@ HDRS := Game.hpp
 SRCS := Game.cpp main.cpp
 
 # names of object files
-OBJS := $(SRCS:.c=.o)
+OBJS := $(SRCS:.cpp=.o)
 
 # name of executable
 EXEC := flappy_birb
@@ -25,6 +25,6 @@ $(EXEC): $(OBJS) $(HDRS) Makefile
 
 # recipe to clean the workspace
 clean:
-	rm -f $(EXEC)
+	rm -f $(EXEC) $(OBJS)
 
 .PHONY: all clean
